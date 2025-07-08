@@ -1,17 +1,23 @@
 from sqlalchemy.orm import Session
 
-from auth import get_password_hash
-import models, schemas
+from .auth import get_password_hash
+from .models import Task, User, Permission
+from schemas import TaskCreate, UserCreate, PermissionCreate
 
 
 def get_task(db: Session, task_id: int):
     """Функция для получения задачи по ID"""
-    return db.query(models.Task).filter(models.Task.id == task_id).first()
+    return db.query(Task).filter(Task.id == task_id).first()
 
 
-def create_task(db: Session, task: schemas.TaskCreate):
+def create_task(db: Session, task: TaskCreate, owner_id: int):
     """Функция для создания новой задачи"""
-    db_task = models.Task(title=task.title, description=task.description, completed=task.completed)
+    db_task = Task(
+        title=task.title,
+        description=task.description,
+        completed=task.completed if hasattr(task, 'completed') else False,
+        owner_id=owner_id
+    )
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -20,7 +26,7 @@ def create_task(db: Session, task: schemas.TaskCreate):
 
 def update_task(db: Session, task_id: int, task_data: dict):
     """Функция обновления задачи"""
-    db_task = db.query(models.Task).filter(models.Task.id == task_id)
+    db_task = db.query(Task).filter(Task.id == task_id)
     db_task.update(task_data)
     db.commit()
     return db_task.first()
@@ -38,22 +44,22 @@ def delete_task(db: Session, task_id: int):
 
 def get_user(db: Session, username: str):
     """Функция получения пользователя по имени"""
-    return db.query(models.User).filter(models.User.username == username).first()
+    return db.query(User).filter(User.username == username).first()
 
 
-def create_user(db: Session, user: schemas.UserCreate):
+def create_user(db: Session, user: UserCreate):
     """Функция создания пользователя"""
     hashed_password = get_password_hash(user.password)
-    db_user = models.User(username=user.username, password=hashed_password)
+    db_user = User(username=user.username, password=hashed_password)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
 
 
-def create_permission(db: Session, permission: schemas.PermissionCreate):
+def create_permission(db: Session, permission: PermissionCreate):
     """Функция создания прав доступа"""
-    db_permission = models.Permission(**permission.dict())
+    db_permission = Permission(**permission.dict())
     db.add(db_permission)
     db.commit()
     db.refresh(db_permission)
@@ -62,15 +68,15 @@ def create_permission(db: Session, permission: schemas.PermissionCreate):
 
 def get_permission(db: Session, task_id: int, user_id: int):
     """Функция получения прав доступа"""
-    return db.query(models.Permission).filter(
-        models.Permission.task_id == task_id,
-        models.Permission.user_id == user_id
+    return db.query(Permission).filter(
+        Permission.task_id == task_id,
+        Permission.user_id == user_id
     ).first()
 
 
 def delete_permission(db: Session, permission_id: int):
     """Функция удаления прав доступа"""
-    permission = db.query(models.Permission).filter(models.Permission.id == permission_id).first()
+    permission = db.query(Permission).filter(Permission.id == permission_id).first()
     if permission:
         db.delete(permission)
         db.commit()
