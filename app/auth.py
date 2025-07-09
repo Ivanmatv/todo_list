@@ -28,10 +28,17 @@ def create_access_token(data: dict):
 
 def decode_token(token: str):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token, 
+            SECRET_KEY, 
+            algorithms=[ALGORITHM],
+            options={"verify_exp": True}
+        )
+        if "sub" not in payload:
+            raise JWTError("Missing 'sub' in token")
         return payload
-    except JWTError:
+    except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
+            detail=f"Invalid token: {str(e)}",
         )

@@ -1,45 +1,28 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from contextlib import asynccontextmanager
 
 from .models import Task, Base, User, Permission
-from schemas import UserCreate, UserLogin, TaskCreate, PermissionCreate
+from .schemas import UserCreate, UserLogin, TaskCreate, PermissionCreate
 from .crud import (
+    create_task,
     get_task,
+    update_task,
+    delete_task,
+    create_user,
     get_user,
     get_permission,
     create_permission,
-    create_task,
-    create_user,
-    delete_permission,
-    delete_task
+    delete_permission
 )
 from .auth import decode_token, verify_password, create_access_token
 from .database import SessionLocal, engine
 
-app = FastAPI()
 
-
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def get_current_user(token: str, db: Session = Depends(get_db)):
-    payload = decode_token(token)
-    user = get_user(db, username=payload.get("sub"))
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid user")
-    return user
-
-
-@app.on_event("startup")
-async def startup_event():
-    # Проверка подключения к БД
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     try:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version()"))
@@ -50,8 +33,46 @@ async def startup_event():
         import sys
         sys.exit(1)
 
-    # Создание таблиц
     Base.metadata.create_all(bind=engine)
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    try:
+        payload = decode_token(token)
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+        user = get_user(db, username=username)
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        return user
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=401,
+            detail=f"Could not validate credentials: {str(e)}"
+        )
 
 
 @app.get("/")
@@ -100,7 +121,7 @@ def get_tasks(
 
 
 @app.put("/tasks/{task_id}")
-def update_task(
+def update_task_endpoint(
     task_id: int,
     task_data: TaskCreate,
     current_user: User = Depends(get_current_user),
@@ -115,7 +136,7 @@ def update_task(
         if not permission or not permission.can_edit:
             raise HTTPException(status_code=403, detail="Нет прав на редактирование")
 
-    return update_task(db, task_id, task_data.dict())
+    return update_task(db, task_id, task_data.model_dump())
 
 
 @app.delete("/tasks/{task_id}")
@@ -152,7 +173,7 @@ def delete_permission_endpoint(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    permission = db.query(Permission).get(permission_id)
+    permission = db.get(Permission, permission_id)
     if not permission:
         raise HTTPException(status_code=404, detail="Права не найдены")
 
