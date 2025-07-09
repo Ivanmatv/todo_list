@@ -160,7 +160,7 @@ def create_permission_endpoint(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    task = get_task(db, permission.task_id)
+    task = delet_task(db, permission.task_id)
     if not task or task.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Только владелец может предоставить права")
 
