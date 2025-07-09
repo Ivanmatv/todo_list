@@ -42,7 +42,11 @@ REST API приложение для управления задачами с в
     DB_PORT=5432
     DB_NAME=todo_db
     ```
-4. Также можно запустить при помощи Dockerfile:
+4. Запуск приложения:
+    ```bash
+    uvicorn app.main:app --reload
+    ```
+5. Также можно запустить при помощи Dockerfile:
 
     ```bash
     docker build -t todo-app .
