@@ -29,10 +29,10 @@ def update_task(db: Session, task_id: int, task_data: dict):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         return None
-        
+
     for key, value in task_data.items():
         setattr(db_task, key, value)
-        
+
     db.commit()
     db.refresh(db_task)
     return db_task

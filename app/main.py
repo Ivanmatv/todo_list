@@ -140,7 +140,7 @@ def update_task_endpoint(
 
 
 @app.delete("/tasks/{task_id}")
-def delete_task_endpoitn(
+def delete_task_endpoint(
     task_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
